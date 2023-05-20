@@ -25,15 +25,6 @@ class Service:
         self.metadata.drop_all(self.connection, checkfirst=True)
         self.metadata.create_all(self.connection, checkfirst=False)
 
-    def insert(self, collection: str, data_serialized: Any) -> int:
-        schema = self.schemas[collection]()
-        data = cast(dict, schema.load(data_serialized))
-        stmt = self.tables[collection].insert().values(**data)
-        result = cast(CursorResult, self.connection.execute(stmt))
-        if result and result.inserted_primary_key:
-            return result.inserted_primary_key[0]
-        raise Exception('ID cannot be retrieved')
-    
     def select(self, collection: str, id_: int) -> Optional[dict]:
         table = self.tables[collection]
         stmt = table.select().where(table.c.id == id_)
@@ -43,6 +34,27 @@ class Service:
             schema = self.schemas[collection]()
             return cast(dict, schema.dump(row._asdict()))
         return None
+
+    def insert(self, collection: str, data_serialized: Any) -> int:
+        schema = self.schemas[collection]()
+        data = cast(dict, schema.load(data_serialized))
+        stmt = self.tables[collection].insert().values(**data)
+        result = cast(CursorResult, self.connection.execute(stmt))
+        if result and result.inserted_primary_key:
+            return result.inserted_primary_key[0]
+        raise Exception('ID cannot be retrieved')
+    
+    def update(self, collection: str, id_: int, data_serialized: Any) -> None:
+        schema = self.schemas[collection]()
+        data = cast(dict, schema.load(data_serialized))
+        table = self.tables[collection]
+        stmt = table.update().values(**data).where(table.c.id == id_)
+        self.connection.execute(stmt)
+
+    def delete(self, collection: str, id_: int) -> None:
+        table = self.tables[collection]
+        stmt = table.delete().where(table.c.id == id_)
+        self.connection.execute(stmt)
 
     def _generate_table(self, collection: dict) -> Table:
         return Table(
