@@ -45,26 +45,21 @@ class Service:
         stmt = table.select().where(table.c.id == id_)
         result = cast(CursorResult, self.connection.execute(stmt))
         row = result.first()
-        if row:
-            schema = self.schemas[coll_name]()
-            return cast(dict, schema.dump(row._asdict()))
-        return None
+        return row._asdict() if row else None
 
     def insert(self, coll_name: str, data: dict) -> dict:
         return self._insert_impl(self.coll_cfgs[coll_name], data, parent_cfgs=[])
     
     def _insert_impl(self, coll_cfg: dict, data: dict, parent_cfgs: list[dict]) -> dict:
         data_children = {}
+        result = data.copy()
         for child_coll in coll_cfg.get('children', []):
-            data_children[child_coll['name']] = data.pop(child_coll['name'])
+            data_children[child_coll['name']] = result.pop(child_coll['name'])
         name_prefix = ''.join(f"{c['name']}_" for c in parent_cfgs)
-        stmt = self.tables[name_prefix + coll_cfg['name']].insert().values(**data)
+        stmt = self.tables[name_prefix + coll_cfg['name']].insert().values(**result)
         cursor_result = cast(CursorResult, self.connection.execute(stmt))
         if cursor_result and cursor_result.inserted_primary_key:
-            result = {
-                **data,
-                "id": cursor_result.inserted_primary_key[0]
-            }
+            result['id'] =  cursor_result.inserted_primary_key[0]
             for child_coll in coll_cfg.get('children', []):
                 result[child_coll['name']] = [
                     self._insert_impl(
@@ -77,10 +72,28 @@ class Service:
             return result
         raise Exception('ID cannot be retrieved')
 
-    def update(self, coll_name: str, id_: int, data: dict) -> None:
+    def update(self, coll_name: str, id_: int, data: dict) -> dict:
+        coll_cfg = self.coll_cfgs[coll_name]
+        data_children = {}
+        result = {**data, "id": id_}
+        for child_coll in coll_cfg.get('children', []):
+            data_children[child_coll['name']] = result.pop(child_coll['name'])
         table = self.tables[coll_name]
-        stmt = table.update().values(**data).where(table.c.id == id_)
+        stmt = table.update().values(**result).where(table.c.id == id_)
         self.connection.execute(stmt)
+        for child_coll in coll_cfg.get('children', []):
+            table = self.tables[coll_name + '_' + child_coll['name']]
+            stmt = table.delete().where(table.c[f"{coll_name}_id"] == id_)
+            self.connection.execute(stmt)
+            result[child_coll['name']] = [
+                self._insert_impl(
+                    child_coll,
+                    {**d, f"{coll_cfg['name']}_id": result['id']},
+                    parent_cfgs=[coll_cfg]
+                )
+                for d in data_children[child_coll['name']]
+            ]
+        return result
 
     def delete(self, coll_name: str, id_: int) -> None:
         table = self.tables[coll_name]
