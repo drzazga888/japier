@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "japier"
+authors = [
+    { name="Kamil Drzazga", email="drzazga888@gmail.com" },
+]
+dependencies = [
+    "SQLAlchemy",
+    "marshmallow"
+]
+dynamic = [
+    "version"
+]
+
+[project.optional-dependencies]
+test = [
+    "mysqlclient",
+    "pytest"
+]
+
+[tool.hatch.version]
+source = "vcs"
