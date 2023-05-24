@@ -1,9 +1,9 @@
 import pathlib
-from collections import OrderedDict
 import pytest
 import sqlalchemy as sa
 import sqlalchemy.event as sa_event
 from japier import Service
+from japier.db import DBService
 
 
 def _fk_pragma_on_connect(dbapi_con, con_record):
@@ -11,17 +11,22 @@ def _fk_pragma_on_connect(dbapi_con, con_record):
 
 
 @pytest.fixture
-def connection(tmp_path: pathlib.Path):
+def engine(tmp_path: pathlib.Path):
     db_path = tmp_path.joinpath('db.sqlite3')
     engine = sa.create_engine(f"sqlite:///{db_path}")
     sa_event.listen(engine, 'connect', _fk_pragma_on_connect)
+    return engine
+
+
+@pytest.fixture
+def connection(engine: sa.Engine):
     with engine.connect() as conn:
         yield conn
 
 
 @pytest.fixture
-def service(connection: sa.Connection):
-    service = Service(
+def service():
+    return Service(
         coll_cfgs=[
             {
                 "name": "category",
@@ -59,22 +64,29 @@ def service(connection: sa.Connection):
                     }
                 ]
             }
-        ],
-        connection=connection
+        ]
     )
-    service.metadata.create_all(connection)
-    return service
 
 
 @pytest.fixture
-def seed(service: Service):
+def init_db(service: Service, connection: sa.Connection):
+    service.metadata.create_all(connection)
+
+
+@pytest.fixture
+def db_service(service: Service, connection: sa.Connection):
+    return service.db(connection)
+
+
+@pytest.fixture
+def seed(db_service: DBService):
     category_input = {
         'name': 'test-name'
     }
     category_input_2 = {
         'name': 'test-name-2'
     }
-    category_output = service.insert('category', category_input)
+    category_output = db_service.insert('category', category_input)
     computer_input = {
         'category_id': category_output['id'],
         'disks': [
@@ -122,7 +134,7 @@ def seed(service: Service):
             }
         ]
     }
-    computer_output = service.insert('computer', computer_input)
+    computer_output = db_service.insert('computer', computer_input)
     return [
         {
             "name": "category",

@@ -1,4 +1,5 @@
 from typing import cast, Type
+import pytest
 import sqlalchemy as sa
 import marshmallow as ma
 from japier import Service
@@ -53,42 +54,13 @@ def test_tables(service: Service):
     assert isinstance(partitions_table.c.name.type, sa.Text)
 
 
-def test_insert(seed: list[dict]):
-    for seed_item in seed:
-        out_no_id = seed_item['out'].copy()
-        id_ = out_no_id.pop('id')
-        assert isinstance(id_, int)
-        assert seed_item['in'] == out_no_id
-
-
-def test_select(service: Service, seed: list[dict]):
-    for seed_item in seed:
-        assert service.select(seed_item['name'], seed_item['out']['id']) == seed_item['out']
-
-
-def test_select_many(service: Service, seed: list[dict]):
-    for seed_item in seed:
-        assert service.select_many(seed_item['name']) == [seed_item['out']]
-
-
-def test_delete(service: Service, seed: list[dict]):
-    for seed_item in reversed(seed):
-        service.delete(seed_item['name'], seed_item['out']['id'])
-        assert service.select(seed_item['name'], seed_item['out']['id']) is None
-
-
-def test_update(service: Service, seed: list[dict]):
-    for seed_item in seed:
-        out_2 = service.update(seed_item['name'], seed_item['out']['id'], seed_item['in_2'])
-        assert out_2 == {**seed_item['in_2'], 'id': seed_item['out']['id']}
-        assert service.select(seed_item['name'], seed_item['out']['id']) == out_2
-
-
+@pytest.mark.usefixtures('init_db')
 def test_deserialize(service: Service, seed: list[dict]):
     for seed_item in seed:
         assert service.deserialize(seed_item['name'], seed_item['in']) == seed_item['in']
 
 
+@pytest.mark.usefixtures('init_db')
 def test_serialize(service: Service, seed: list[dict]):
     for seed_item in seed:
         assert service.serialize(seed_item['name'], seed_item['out']) == seed_item['out']

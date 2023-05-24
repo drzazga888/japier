@@ -16,7 +16,11 @@ dynamic = [
 ]
 
 [project.optional-dependencies]
+flask = [
+    "flask"
+]
 test = [
+    "japier[flask]",
     "pytest"
 ]
 
