@@ -36,10 +36,12 @@ class TextField(Field):
 class RefField(Field):
 
     def get_sqlalchemy_column(self) -> Column:
+        ondelete = 'CASCADE' if self.cfg['cascade_on_delete'] else 'RESTRICT'
+        ref_table = '_'.join(self.cfg['ref_path'])
         return Column(
             self.cfg['name'],
             Integer,
-            ForeignKey(f"{self.cfg['ref']}.id", ondelete='CASCADE'),
+            ForeignKey(f"{ref_table}.id", ondelete=ondelete),
             nullable=False
         )
 

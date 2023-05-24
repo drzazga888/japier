@@ -1,13 +1,20 @@
 import pathlib
+from collections import OrderedDict
 import pytest
 import sqlalchemy as sa
+import sqlalchemy.event as sa_event
 from japier import Service
+
+
+def _fk_pragma_on_connect(dbapi_con, con_record):
+    dbapi_con.execute('pragma foreign_keys=ON')
 
 
 @pytest.fixture
 def connection(tmp_path: pathlib.Path):
     db_path = tmp_path.joinpath('db.sqlite3')
     engine = sa.create_engine(f"sqlite:///{db_path}")
+    sa_event.listen(engine, 'connect', _fk_pragma_on_connect)
     with engine.connect() as conn:
         yield conn
 
@@ -17,7 +24,7 @@ def service(connection: sa.Connection):
     service = Service(
         coll_cfgs=[
             {
-                "name": "project",
+                "name": "category",
                 "fields": [
                     {
                         "name": "name",
@@ -26,20 +33,27 @@ def service(connection: sa.Connection):
                 ]
             },
             {
-                "name": "request",
+                "name": "computer",
                 "fields": [
                     {
-                        "name": "project_id",
+                        "name": "category_id",
                         "type": "ref",
-                        "ref": "project"
+                        "ref_path": ("category",),
+                        "cascade_on_delete": False
                     },
                     {
-                        "name": "stakeholders",
+                        "name": "disks",
                         "type": "collection",
                         "fields": [
                             {
-                                "name": "email",
-                                "type": "text"
+                                "name": "partitions",
+                                "type": "collection",
+                                "fields": [
+                                    {
+                                        "name": "name",
+                                        "type": "text"
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -54,48 +68,72 @@ def service(connection: sa.Connection):
 
 @pytest.fixture
 def seed(service: Service):
-    project_input = {
+    category_input = {
         'name': 'test-name'
     }
-    project_input_2 = {
+    category_input_2 = {
         'name': 'test-name-2'
     }
-    project_output = service.insert('project', project_input)
-    request_input = {
-        'project_id': project_output['id'],
-        'stakeholders': [
+    category_output = service.insert('category', category_input)
+    computer_input = {
+        'category_id': category_output['id'],
+        'disks': [
             {
-                'email': 'email1'
+                'partitions': [
+                    {
+                        "name": "system"
+                    },
+                    {
+                        "name": "data1"
+                    }
+                ]
             },
             {
-                'email': 'email2'
+                'partitions': [
+                    {
+                        "name": "recovery"
+                    },
+                    {
+                        "name": "data2"
+                    }
+                ]
             }
         ]
     }
-    request_input_2 = {
-        'project_id': project_output['id'],
-        'stakeholders': [
+    computer_input_2 = {
+        'category_id': category_output['id'],
+        'disks': [
             {
-                'email': 'email3'
+                'partitions': [
+                    {
+                        "name": "data"
+                    }
+                ]
             },
             {
-                'email': 'email4'
-            },
-            {
-                'email': 'email5'
+                'partitions': [
+                    {
+                        "name": "system"
+                    },
+                    {
+                        "name": "recovery"
+                    }
+                ]
             }
         ]
     }
-    request_output = service.insert('request', request_input)
-    return {
-        "project": {
-            "in": project_input,
-            "in_2": project_input_2,
-            "out": project_output
+    computer_output = service.insert('computer', computer_input)
+    return [
+        {
+            "name": "category",
+            "in": category_input,
+            "in_2": category_input_2,
+            "out": category_output
         },
-        "request": {
-            "in": request_input,
-            "in_2": request_input_2,
-            "out": request_output
+        {
+            "name": "computer",
+            "in": computer_input,
+            "in_2": computer_input_2,
+            "out": computer_output
         }
-    }
+    ]

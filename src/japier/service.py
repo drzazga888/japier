@@ -23,11 +23,11 @@ class Service:
         self.connection = connection
         self.metadata = sa.MetaData()
         self.schemas = {
-            c['name']: self._schema_from_collection(c, parent_cfgs=[])
+            c['name']: self._schema_from_collection(c, parent_colls=[])
             for c in coll_cfgs
         }
         self.tables = {
-            c['name']: self._tables_from_collection(c, parent_cfgs=[])
+            c['name']: self._tables_from_collection(c, parent_colls=[])
             for c in coll_cfgs
         }
 
@@ -128,24 +128,26 @@ class Service:
         stmt = table.delete().where(table.c.id == id_)
         self.connection.execute(stmt)
 
-    def _tables_from_collection(self, coll_cfg: dict, parent_cfgs: list[dict]) -> dict:
-        name = ''.join(f"{c['name']}_" for c in parent_cfgs) + coll_cfg['name']
+    def _tables_from_collection(self, coll_cfg: dict, parent_colls: list[dict]) -> dict:
+        parent_name = '_'.join(c['name'] for c in parent_colls)
+        name = f"{parent_name}_{coll_cfg['name']}" if parent_name else coll_cfg['name']
         cols = [
             self._get_field({"name": "id", "type": "id"}).get_sqlalchemy_column()
         ]
         children = {}
-        if parent_cfgs:
-            last_parent_cfg = parent_cfgs[-1]
+        if parent_colls:
+            last_parent_cfg = parent_colls[-1]
             cols.append(
                 self._get_field({
                     "name": f"{last_parent_cfg['name']}_id",
                     "type": "ref",
-                    "ref": last_parent_cfg['name']
+                    "ref_path": (c['name'] for c in parent_colls),
+                    "cascade_on_delete": True
                 }).get_sqlalchemy_column()
             )
         for field_cfg in coll_cfg['fields']:
             if field_cfg['type'] == 'collection':
-                children[field_cfg['name']] = self._tables_from_collection(field_cfg, parent_cfgs + [coll_cfg])
+                children[field_cfg['name']] = self._tables_from_collection(field_cfg, parent_colls + [coll_cfg])
             else:
                 cols.append(
                     self._get_field(field_cfg).get_sqlalchemy_column()
@@ -156,15 +158,15 @@ class Service:
             "children": children
         }
 
-    def _schema_from_collection(self, coll_cfg: dict, parent_cfgs: list[dict]) -> Type[ma.Schema]:
-        name = ''.join(f"{c['name']}_" for c in parent_cfgs) + coll_cfg['name']
+    def _schema_from_collection(self, coll_cfg: dict, parent_colls: list[dict]) -> Type[ma.Schema]:
+        name = ''.join(f"{c['name']}_" for c in parent_colls) + coll_cfg['name']
         fields: dict[str, ma.fields.Field | type] = {
             "id": self._get_field({"name": "id", "type": "id"}).get_marshmallow_field()
         }
         for field_cfg in coll_cfg['fields']:
             if field_cfg['type'] == 'collection':
                 fields[field_cfg['name']] = ma.fields.List(
-                    ma.fields.Nested(self._schema_from_collection(field_cfg, parent_cfgs + [coll_cfg])),
+                    ma.fields.Nested(self._schema_from_collection(field_cfg, parent_colls + [coll_cfg])),
                     required=True
                 )
             else:
