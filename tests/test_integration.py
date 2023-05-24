@@ -82,3 +82,13 @@ def test_update(service: Service, seed: list[dict]):
         out_2 = service.update(seed_item['name'], seed_item['out']['id'], seed_item['in_2'])
         assert out_2 == {**seed_item['in_2'], 'id': seed_item['out']['id']}
         assert service.select(seed_item['name'], seed_item['out']['id']) == out_2
+
+
+def test_deserialize(service: Service, seed: list[dict]):
+    for seed_item in seed:
+        assert service.deserialize(seed_item['name'], seed_item['in']) == seed_item['in']
+
+
+def test_serialize(service: Service, seed: list[dict]):
+    for seed_item in seed:
+        assert service.serialize(seed_item['name'], seed_item['out']) == seed_item['out']
