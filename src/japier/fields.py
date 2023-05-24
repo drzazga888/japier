@@ -1,5 +1,5 @@
-from typing import Type
-from sqlalchemy import Column, Text, Integer, ForeignKey
+from typing import Type, Optional
+from sqlalchemy import Column, Text, Integer, ForeignKey, Identity
 from marshmallow import fields, validate
 
 
@@ -13,6 +13,15 @@ class Field:
 
     def get_marshmallow_field(self) -> fields.Field:
         raise NotImplementedError()
+    
+
+class IdField(Field):
+
+    def get_sqlalchemy_column(self) -> Column:
+        return Column(self.cfg['name'], Integer, Identity(), primary_key=True)
+
+    def get_marshmallow_field(self) -> fields.Field:
+        return fields.Integer(dump_only=True)
 
 
 class TextField(Field):
@@ -39,6 +48,7 @@ class RefField(Field):
 
 
 DEFAULT_FIELDS: dict[str, Type[Field]] = {
+    "id": IdField,
     "text": TextField,
     "ref": RefField
 }
