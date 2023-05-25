@@ -64,3 +64,9 @@ def test_deserialize(service: Service, seed: list[dict]):
 def test_serialize(service: Service, seed: list[dict]):
     for seed_item in seed:
         assert service.serialize(seed_item['name'], seed_item['out']) == seed_item['out']
+
+
+@pytest.mark.usefixtures('init_db')
+def test_serialize_many(service: Service, seed: list[dict]):
+    for seed_item in seed:
+        assert service.serialize_many(seed_item['name'], [seed_item['out']]) == [seed_item['out']]
