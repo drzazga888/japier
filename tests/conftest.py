@@ -29,7 +29,7 @@ def service():
     return Service(
         coll_cfgs=[
             {
-                "name": "category",
+                "name": "categories",
                 "fields": [
                     {
                         "name": "name",
@@ -38,12 +38,12 @@ def service():
                 ]
             },
             {
-                "name": "computer",
+                "name": "computers",
                 "fields": [
                     {
                         "name": "category_id",
                         "type": "ref",
-                        "ref_path": ("category",),
+                        "ref_path": ("categories",),
                         "cascade_on_delete": False
                     },
                     {
@@ -86,7 +86,7 @@ def seed(db_service: DBService):
     category_input_2 = {
         'name': 'test-name-2'
     }
-    category_output = db_service.insert('category', category_input)
+    category_output = db_service.insert('categories', category_input)
     computer_input = {
         'category_id': category_output['id'],
         'disks': [
@@ -134,16 +134,16 @@ def seed(db_service: DBService):
             }
         ]
     }
-    computer_output = db_service.insert('computer', computer_input)
+    computer_output = db_service.insert('computers', computer_input)
     return [
         {
-            "name": "category",
+            "name": "categories",
             "in": category_input,
             "in_2": category_input_2,
             "out": category_output
         },
         {
-            "name": "computer",
+            "name": "computers",
             "in": computer_input,
             "in_2": computer_input_2,
             "out": computer_output
